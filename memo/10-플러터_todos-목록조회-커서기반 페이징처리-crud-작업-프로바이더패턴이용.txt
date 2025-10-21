@@ -1,0 +1,1536 @@
+#플러터 #모바일개발
+
+스프링 서버 연동 작업2, 
+todos crud, 커서 기반 페이징 처리. 
+jwt 이용해서, 인증 후, 요청 및 응답 
+
+준비물 : 스프링 백엔드 작업한 서버 필요. 
+IDE : 인텔리 제이
+마리아 디비 사용중. (도커 이용, 디비 서버 켜기)
+깃 주소 : 
+https://github.com/lsy3709/Server501_Test/tree/main/SpringBasic/api5012
+
+기능 확인
+시스템이 jwt 토큰 인증 형식으로 되어서, 
+
+인증 확인 방법. 
+
+포스트맨으로 
+
+메소드 : post 
+주소 : http://localhost:8080/generateToken
+raw -> json 형식으로 
+예시)
+{
+    "mid" : "lsy",
+    "mpw" : "1234"
+}
+
+2
+
+포스트맨으로 
+
+메소드 : post 
+주소 : http://localhost:8080/member/register
+raw -> json 형식으로 
+
+회원 가입 필요할 경우. 
+
+{
+    "mid" :"admin",
+    "mpw" : "1234"
+}
+
+
+리턴, 액세스 토큰 받으면 이걸로 작업. 
+예시)
+{
+     "accessToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtaWQiOiJsc3kiLCJpYXQiOjE3NDM2Mzk0NzQsImV4cCI6MTc0MzcyNTg3NH0.Vlokf1ouEs5DFj9ho1OJSyHFt0yJQSA_EBwxvUHgzvY",
+    "refreshToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtaWQiOiJsc3kiLCJpYXQiOjE3NDM2Mzk0NzQsImV4cCI6MTc0NjIzMTQ3NH0.7_zbxf_eXzIPKHFIE9T05Hb0zMCnlsoBK0H1EsgslNw"
+}
+
+1 포스트맨 
+
+2 스웨거 이용. 
+http://localhost:8080/swagger-ui/index.html
+
+상단의 authorize 부분에 액세스 토큰 입력 후, 
+아래의 레스트 테스트 확인 하면됨. 
+
+=========================================================
+플러터 , 화면작업, 컨트롤러 작업 필요함. 
+
+폴더 
+sample_routing -> todos_test ->
+controller, screen 화면 각각 폴더 생성. 
+
+
+1.
+todos  전체 조회. 
+
+작업
+
+1) 
+컨트롤러
+todos_list_controller.dart
+
+
+
+1)-2 , TodoDTO 만들기. 
+dto -> todos_todoDTO.dart
+
+class TodoDTO {
+  final int tno;
+  final String title;
+  final String description;
+  final String writer;
+  final DateTime dueDate;
+  final bool complete;
+
+  TodoDTO({
+    required this.tno,
+    required this.title,
+    required this.description,
+    required this.writer,
+    required this.dueDate,
+    required this.complete,
+  });
+
+  factory TodoDTO.fromJson(Map<String, dynamic> json) {
+    return TodoDTO(
+      tno: json['tno'] ?? 0,
+      title: json['title'] ?? "제목 없음",
+      description: json['description'] ?? "설명 없음",
+      writer: json['writer'] ?? "알 수 없음",
+      dueDate: json['dueDate'] != null
+          ? DateTime.parse(json['dueDate']) // ✅ JSON → DateTime 변환
+          : DateTime.now(),
+      complete: json['complete'] ?? false,
+    );
+  }
+
+  // ✅ dueDate를 "YYYY-MM-DD HH:mm" 형식으로 변환하는 함수 추가
+  String get formattedDueDate {
+    return "${dueDate.year}-${_twoDigits(dueDate.month)}-${_twoDigits(dueDate.day)} ";
+    // "${_twoDigits(dueDate.hour)}:${_twoDigits(dueDate.minute)}";
+  }
+
+  // ✅ 한 자리 수일 경우 앞에 0을 추가하는 함수
+  String _twoDigits(int n) {
+    return n.toString().padLeft(2, '0');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "tno": tno,
+      "title": title,
+      "description": description,
+      "writer": writer,
+      "dueDate": "${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}", // ✅ 날짜 포맷 수정
+      "complete": complete,
+    };
+  }
+}
+
+1)-3 
+todos_page_response_dto.dart 
+class PageResponseDTO<T> {
+  final int page;
+  final int size;
+  final int total;
+  final int start;
+  final int end;
+  final bool prev;
+  final bool next;
+  final List<T> dtoList;
+
+  // ✅ 추가된 멤버 변수
+  final int? nextCursor; // 다음 페이지 요청을 위한 커서 ID
+  final bool hasNext; // 다음 데이터 존재 여부
+
+  PageResponseDTO({
+    required this.page,
+    required this.size,
+    required this.total,
+    required this.start,
+    required this.end,
+    required this.prev,
+    required this.next,
+    required this.dtoList,
+    required this.nextCursor, // ✅ 추가
+    required this.hasNext, // ✅ 추가
+  });
+
+  factory PageResponseDTO.fromJson(Map<String, dynamic> json, T Function(Map<String, dynamic>) fromJsonT) {
+    return PageResponseDTO(
+      page: json['page'] ?? 1, // 기본값 1
+      size: json['size'] ?? 10, // 기본값 10
+      total: json['total'] ?? 0, // 기본값 0
+      start: json['start'] ?? 1, // 기본값 1
+      end: json['end'] ?? 1, // 기본값 1
+      prev: json['prev'] ?? false, // 기본값 false
+      next: json['next'] ?? false, // 기본값 false
+      dtoList: (json['dtoList'] as List?)?.map((item) => fromJsonT(item)).toList() ?? [], // `null`이면 빈 리스트 반환
+      nextCursor: json['nextCursor'], // ✅ 추가
+      hasNext: json['hasNext'] ?? false, // ✅ 추가
+    );
+  }
+}
+
+
+2) 
+화면 
+todos_list_screen.dart 
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../controller/todos_list_controller.dart';
+
+class TodosScreen extends StatefulWidget {
+  const TodosScreen({super.key});
+
+  @override
+  _TodosScreenState createState() => _TodosScreenState();
+}
+
+class _TodosScreenState extends State<TodosScreen> {
+  // 검색창 에 대한 , 컨트롤러를 따로 분리 작업했음.
+  late ScrollController _scrollController;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode(); // ✅ 포커스 감지용 FocusNode
+  bool showScrollToTopButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final todoController = context.read<TodoController>();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      todoController.fetchTodos();
+    });
+
+    // 스크롤 버튼을 클릭시, 화면 이동 용으로 만듦.
+    // 웹 -> 탑 버튼.
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels > 300) {
+        if (!showScrollToTopButton) {
+          setState(() {
+            showScrollToTopButton = true;
+          });
+        }
+      } else {
+        if (showScrollToTopButton) {
+          setState(() {
+            showScrollToTopButton = false;
+          });
+        }
+      }
+
+      if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent &&
+          !todoController.isFetchingMore) {
+        todoController.fetchMoreTodos();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      context.read<TodoController>().updateSearchParams("TWC", ""); // ✅ 검색어 및 결과 초기화
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final todoController = context.watch<TodoController>();
+
+    return GestureDetector(
+      onTap: () {
+        // ✅ 다른 곳을 터치하면 키보드 숨기고 검색 초기화
+        if (_searchFocusNode.hasFocus) {
+          _searchFocusNode.unfocus();
+          // _clearSearch();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text("Todos 리스트")),
+        body: Column(
+          children: [
+            // ✅ 검색 입력창
+            Container(
+              height: 100,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode, // ✅ 포커스 노드 적용
+                decoration: InputDecoration(
+                  labelText: "검색어 입력",
+                  border: OutlineInputBorder(),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: _clearSearch,
+                  )
+                      : null,
+                ),
+                onChanged: (value) {
+                  todoController.updateSearchParams("TWC", value); // ✅ 검색어 변경 시 즉시 서버 호출
+                },
+              ),
+            ),
+
+            // ✅ 검색 결과 및 출력 개수 표시
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  todoController.todos.isEmpty
+                      ? "🔍 검색 결과가 없습니다."
+                      : "🔍 검색어: \"${todoController.keyword}\" / 총 ${todoController.remainingCount }개 중 ${todoController.todos.length}개 출력",
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
+                ),
+              ),
+            ),
+
+            // ✅ 리스트 출력
+            Expanded(
+              child: todoController.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : todoController.todos.isEmpty
+                  ? const Center(child: Text("할 일이 없습니다."))
+                  : ListView.builder(
+                controller: _scrollController,
+                itemCount: todoController.todos.length + (todoController.hasMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (!todoController.hasMore && index == todoController.todos.length) {
+                    return const SizedBox();
+                  }
+
+                  if (index == todoController.todos.length) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(10.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final todo = todoController.todos[index];
+                  return ListTile(
+                    title: Text(
+                      "${index + 1}. ${todo.title}",
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text("ID: ${todo.tno}",
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black54)),
+                            Text(", 작성자: ${todo.writer}",
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black54)),
+                          ],
+                        ),
+                        Text("작성일: ${todo.dueDate}",
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black54)),
+                        Icon(
+                          todo.complete ? Icons.check_circle : Icons.circle_outlined,
+                          color: todo.complete ? Colors.green : Colors.grey,
+                          size: 24,
+                        ),
+                        Text(
+                          todo.complete ? '완료' : '미완료',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: todo.complete ? Colors.black : Colors.grey,
+                            decoration: todo.complete ? TextDecoration.lineThrough : TextDecoration.none,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // ✅ 수정 아이콘 버튼 추가
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          onPressed: () {
+                            Navigator.pushNamed(
+                              context,
+                              "/todoDetail",
+                              arguments: todo.tno, // ✅ tno 전달
+                            );
+                          },
+                        ),
+                        // ✅ 삭제 버튼 (삭제 확인 다이얼로그 호출)
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          // onPressed: () => todoController.confirmDelete(context, todo.tno),
+                          onPressed: () => {},
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+
+        // ✅ "맨 위로" 버튼 및 "추가하기" 버튼
+        floatingActionButton: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (showScrollToTopButton)
+              FloatingActionButton(
+                heroTag: "scrollToTop",
+                onPressed: _scrollToTop,
+                backgroundColor: Colors.blueAccent,
+                child: const Icon(Icons.arrow_upward, color: Colors.white),
+              ),
+            const SizedBox(height: 10),
+            FloatingActionButton(
+              heroTag: "addTodo",
+              onPressed: () {
+                Navigator.pushNamed(context, "/todoCreate");
+              },
+              child: const Icon(Icons.add),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+3) 
+프로바이더 등록 
+import 'package:busanit501_flutter_test/sample_routing/login_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_app_routing.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/pd_test_controller/food_controller.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/controller/todos_list_controller.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/controller/todos_login_controller.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/controller/todos_signup_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+
+void main() {
+  // runApp(MyApp());
+  // 프로바이더 등록 작업,
+  // runApp(MyAppRouting());
+  runApp(
+    MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (context) => FoodController()),
+          ChangeNotifierProvider(create: (context) => LoginController()),
+          ChangeNotifierProvider(create: (context) => SignupController()),
+          ChangeNotifierProvider(create: (context) => TodoController())
+        ],
+    child: const MyAppRouting(),)
+  );
+}
+
+
+
+
+
+4)
+라우팅 연결 
+import 'package:busanit501_flutter_test/sample_routing/login_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/main_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen2.dart';
+import 'package:busanit501_flutter_test/sample_routing/pd_test_screen/my_pd_test_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/signup_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_list_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_login.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_main_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_signup_screen.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+class MyAppRouting extends StatelessWidget {
+  const MyAppRouting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      // 시작 하는 화면을, 스플래쉬 화면으로 교체,
+      home: const MySplashScreen2(),
+      //라우팅 준비물 1,
+      routes: {
+        '/main': (context) => const TodosMainScreen(),
+        '/signup': (context) => const TodosSignupScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/pdtest1': (context) => const MyPdTestScreen(),
+        '/todos': (context) => const TodosScreen(),
+      },
+    );
+  }
+}
+
+
+5) 
+메인 화면에 버튼 추가
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:provider/provider.dart';
+
+import '../controller/todos_login_controller.dart';
+
+class TodosMainScreen extends StatefulWidget {
+  const TodosMainScreen({super.key});
+
+  @override
+  State<TodosMainScreen> createState() => _TodosMainScreenState();
+}
+
+class _TodosMainScreenState extends State<TodosMainScreen> {
+  // 플러터 전용의 저장소에 접근 하는 도구, 가져오기, 설정하기.
+  final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
+  String? userId;
+
+  // 최초에 화면을 그릴 때 동작함.
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  // 화면이 변경시 마다 호출.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadUserId(); // 로그아웃 후 다시 화면 열릴 때 호출됨
+  }
+
+
+  // 보안 저장소에서 로그인한 유저 ID 불러오기
+  Future<void> _loadUserId() async {
+    String? mid = await secureStorage.read(key: "mid"); // 저장된 ID 가져오기
+    // 리액트 비슷한 구조이고, 스테이트 상태가 변경이 되면, 화면도 같이 업데이트
+    setState(() {
+      userId = mid;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loginController = context.watch<LoginController>();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('메인 화면'),
+          actions: [
+            // 로그인 상태일 때만 로그아웃 버튼 표시
+            if (loginController.isLoggedIn)
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () => loginController.showLogoutDialog(context),
+              ),
+          ]
+      ),
+
+      body: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Center(
+              child: Text(
+                userId != null ? "환영합니다, $userId님!" : "로그인이 필요합니다.",
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const Center(child: FlutterLogo(size: 100)),
+            const SizedBox(height: 20),
+            if (!loginController.isLoggedIn)
+            ElevatedButton(
+              //라우팅 2번 째 준비물,
+              onPressed: () => Navigator.pushNamed(context, '/signup'),
+              child: const Text('회원 가입'),
+            ),
+
+            if (!loginController.isLoggedIn)
+            OutlinedButton(
+              onPressed: () => Navigator.pushNamed(context, '/login'),
+              child: const Text('로그인'),
+            ),
+
+            if (loginController.isLoggedIn)
+            OutlinedButton(
+              onPressed: () => Navigator.pushNamed(context, '/pdtest1'),
+              child: const Text('공공데이터 연동1'),
+            ),
+            if (loginController.isLoggedIn)
+              OutlinedButton(
+                onPressed: () => Navigator.pushNamed(context, '/todos'),
+                child: const Text('todos 연동 리스트'),
+              ),
+
+          ],
+        ),
+      ),
+    );
+
+  }
+}
+
+=================================================
+글작성 
+
+
+1
+화면 
+todos_add_screen.dart
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../controller/todos_list_controller.dart';
+
+class TodoCreateScreen extends StatefulWidget {
+  const TodoCreateScreen({super.key});
+
+  @override
+  _TodoCreateScreenState createState() => _TodoCreateScreenState();
+}
+
+class _TodoCreateScreenState extends State<TodoCreateScreen> {
+  final TextEditingController _titleController = TextEditingController();
+  DateTime? _dueDate;
+  bool _complete = false;
+  String? userId; // ✅ 로그인한 사용자 ID 저장
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ 로그인한 사용자 ID 가져오기
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final todoController = context.read<TodoController>();
+      String? mid = await todoController.getLoggedInUserId();
+      setState(() {
+        userId = mid;
+      });
+    });
+  }
+
+  Future<void> _submitTodo() async {
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("제목을 입력하세요.")),
+      );
+      return;
+    }
+
+    final todoController = context.read<TodoController>();
+
+    bool success = await todoController.createTodo(
+      _titleController.text,
+      _dueDate ?? DateTime.now(),
+      _complete,
+    );
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("할 일이 추가되었습니다.")),
+      );
+      Navigator.pop(context); // ✅ 작성 완료 후 리스트 화면으로 이동
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("할 일 추가")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            Text(
+              userId != null ? "환영합니다, $userId님!" : "로그인이 필요합니다.",
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: "제목"),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: TextEditingController(text: userId ?? ""),
+              enabled: false, // ✅ 로그인한 사용자 자동 입력 (수정 불가능)
+              decoration: const InputDecoration(labelText: "작성자"),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text("마감일: "),
+                Text(_dueDate != null
+                    ? "${_dueDate!.year}-${_dueDate!.month}-${_dueDate!.day}"
+                    : "선택 안됨"),
+                IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: _dueDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (pickedDate != null) {
+                      setState(() {
+                        _dueDate = pickedDate;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text("완료"),
+              value: _complete,
+              onChanged: (value) {
+                setState(() {
+                  _complete = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _submitTodo,
+              child: const Text("저장"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+2
+컨트롤러 
+todoController 재사용
+코드 작성.
+추가 
+...
+ // 글작성 부분의 컨트롤러
+// ✅ Todo 작성 요청 (`POST /api/todo`)
+  Future<bool> createTodo(String title, DateTime dueDate, bool complete) async {
+    String? accessToken = await secureStorage.read(key: "accessToken");
+    String? mid = await getLoggedInUserId(); // 로그인한 사용자 ID 가져오기
+
+    if (accessToken == null || mid == null) {
+      print("⚠️ [Flutter] 액세스 토큰 또는 사용자 ID 없음");
+      return false;
+    }
+
+    final Uri requestUrl = Uri.parse("$serverIp/");
+
+    final Map<String, dynamic> postData = {
+      "title": title,
+      "writer": mid, // ✅ 로그인한 사용자 ID 자동 입력
+      "dueDate":
+      "${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}",
+      "complete": complete,
+    };
+
+    try {
+      final response = await http.post(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          "Authorization": "Bearer $accessToken",
+        },
+        body: jsonEncode(postData),
+      );
+
+      print("📢 [Flutter] 응답 코드: ${response.statusCode}");
+      print("📢 [Flutter] 응답 바디: ${response.body}");
+
+      if (response.statusCode == 200) {
+        print("✅ [Flutter] Todo 작성 성공!");
+
+        // ✅ 리스트 새로고침
+        await fetchTodos();
+        notifyListeners();
+        return true;
+      } else {
+        print("⚠️ [Flutter] 서버 응답 오류: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ [Flutter] 네트워크 오류: $e");
+    }
+    return false;
+  }
+  
+
+3
+프로바이더 등록 
+todoController 재사용
+
+4
+라우팅 연결 
+import 'package:busanit501_flutter_test/sample_routing/login_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/main_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen2.dart';
+import 'package:busanit501_flutter_test/sample_routing/pd_test_screen/my_pd_test_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/signup_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_add_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_list_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_login.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_main_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_signup_screen.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+class MyAppRouting extends StatelessWidget {
+  const MyAppRouting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      // 시작 하는 화면을, 스플래쉬 화면으로 교체,
+      home: const MySplashScreen2(),
+      //라우팅 준비물 1,
+      routes: {
+        '/main': (context) => const TodosMainScreen(),
+        '/signup': (context) => const TodosSignupScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/pdtest1': (context) => const MyPdTestScreen(),
+        '/todos': (context) => const TodosScreen(),
+        '/todoCreate': (context) => const TodoCreateScreen(),
+      },
+    );
+  }
+}
+
+===============================================
+
+삭제, 
+
+1 
+화면, 
+리스트 화면에서, 삭제 아이콘 으로 대체 
+
+// ✅ 삭제 버튼 (삭제 확인 다이얼로그 호출)
+이벤트 핸들러 부분 추가하기.
+
+IconButton(
+  icon: const Icon(Icons.delete, color: Colors.red),
+  onPressed: () => todoController.confirmDelete(context, todo.tno),
+
+2
+컨트롤러 재상용, 
+삭제 로직 추가. 
+
+//삭제 로직 추가.
+
+  Future<bool> deleteTodo(int tno) async {
+    String? accessToken = await secureStorage.read(key: "accessToken");
+    if (accessToken == null) {
+      print("⚠️ [Flutter] accessToken 없음!");
+      return false;
+    }
+
+    final Uri requestUrl = Uri.parse("$serverIp/$tno");
+    print("📢 [Flutter] DELETE 요청 URL: $requestUrl");
+
+    try {
+      final response = await http.delete(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ [Flutter] Todo 삭제 성공!");
+
+        // ✅ 리스트 새로고침
+        await fetchTodos(); // ✅ UI 업데이트
+        notifyListeners();
+
+        return true;
+      } else {
+        print("⚠️ [Flutter] 삭제 실패: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ [Flutter] 네트워크 오류: $e");
+    }
+    return false;
+  }
+
+  void confirmDelete(BuildContext context, int tno) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("삭제 확인"),
+          content: const Text("정말 삭제하시겠습니까?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("취소"),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // ✅ 다이얼로그 닫기
+                bool success = await deleteTodo(tno);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("삭제되었습니다.")),
+                  );
+                }
+              },
+              child: const Text("삭제", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+3 
+프로바이더 등록 재사용. 
+
+4
+라우팅 , 화면이 없어서, 따로 불필요
+
+-------------------------------------------
+수정. 
+
+1 
+화면 
+todos_edit_screen.dart 
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../controller/todos_list_controller.dart';
+import '../dto/todos_todoDTO.dart';
+
+class TodoDetailScreen extends StatefulWidget {
+  final int tno;
+
+  const TodoDetailScreen({super.key, required this.tno});
+
+  @override
+  _TodoDetailScreenState createState() => _TodoDetailScreenState();
+}
+
+class _TodoDetailScreenState extends State<TodoDetailScreen> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _writerController = TextEditingController();
+  DateTime? _dueDate;
+  bool _complete = false;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTodoDetails();
+  }
+
+  // ✅ `GET /api/todo/{tno}` 요청 (Todo 상세 조회)
+  Future<void> _fetchTodoDetails() async {
+    final todoController = Provider.of<TodoController>(context, listen: false);
+    TodoDTO? todo = await todoController.fetchTodoDetails(widget.tno);
+
+    if (todo != null) {
+      setState(() {
+        _titleController.text = todo.title;
+        _writerController.text = todo.writer;
+        _dueDate = todo.dueDate;
+        _complete = todo.complete;
+        isLoading = false;
+      });
+    } else {
+      // 오류 처리
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("할 일 정보를 불러오지 못했습니다.")),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  // ✅ `PUT /api/todo/{tno}` 요청 (Todo 수정)
+  Future<void> _updateTodo() async {
+    final todoController = Provider.of<TodoController>(context, listen: false);
+    bool success = await todoController.updateTodo(
+      widget.tno,
+      _titleController.text,
+      _writerController.text,
+      _dueDate!,
+      _complete,
+    );
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("할 일이 수정되었습니다.")),
+      );
+      Navigator.pop(context, true); // 수정 완료 후 이전 화면으로 돌아감
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("할 일 수정")),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: "제목"),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _writerController,
+              enabled: false, // 완전 비활성화 (회색 UI)
+              decoration: const InputDecoration(labelText: "작성자"),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text("마감일: "),
+                Text(_dueDate != null
+                    ? "${_dueDate!.year}-${_dueDate!.month}-${_dueDate!.day}"
+                    : "선택 안됨"),
+                IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: _dueDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (pickedDate != null) {
+                      setState(() {
+                        _dueDate = pickedDate;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text("완료"),
+              value: _complete,
+              onChanged: (value) {
+                setState(() {
+                  _complete = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _updateTodo,
+              child: const Text("수정 완료"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+2
+컨트롤러 
+로직 필요. 
+import 'dart:convert';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+
+import '../dto/todos_page_response_dto.dart';
+import '../dto/todos_todoDTO.dart';
+
+class TodoController extends ChangeNotifier {
+  // 로그인한 유저 mid, 액세스 토큰, 리플레쉬 토큰 존재.
+  final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
+  final String serverIp = "http://10.100.201.87:8080/api/todo"; // 서버 주소
+
+  List<TodoDTO> todos = [];
+  bool isLoading = false;
+  bool isFetchingMore = false; // ✅ 추가 데이터 로드 중 여부
+  bool hasMore = true; // ✅ 추가 데이터 여부 확인
+
+
+  // 커서_기반_코드
+  int? lastCursorId; // ✅ 마지막 아이템 ID (커서)
+  int remainingCount = 10; // ✅ 최초 호출 이후 줄여나갈 데이터 개수
+
+  // ✅ 로그인한 사용자 ID 가져오기
+  Future<String?> getLoggedInUserId() async {
+    return await secureStorage.read(key: "mid"); // 보안 저장소에서 유저 ID 가져오기
+  }
+
+  // ✅ 검색 파라미터 추가
+  String searchType = "TWC"; // 기본 검색 타입
+  String keyword = "";
+
+  // ✅ 검색어 변경
+  void updateSearchParams(String type, String newKeyword) {
+    searchType = type;
+    keyword = newKeyword;
+    fetchTodos(); // ✅ 검색어 변경 시 다시 데이터 요청
+  }
+
+
+  // Todos 리스트 조회 요청
+  Future<void> fetchTodos() async {
+    isLoading = true;
+
+    // 커서_기반_코드
+    lastCursorId = null; // ✅ 커서를 초기화
+    remainingCount = 10; //  ✅ 최초에는 전체 개수를 먼저 가져옴
+    // 페이징_기반_코드
+    // currentPage = 1;
+    hasMore = true; // ✅ 처음 로드할 때 더 많은 데이터가 있다고 가정
+    notifyListeners();
+
+    String? accessToken = await secureStorage.read(key: "accessToken");
+
+    if (accessToken == null) {
+      print("토큰이 없습니다.");
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    print(
+        "📢 [Flutter] fetchTodos() 최초 호출: cursor=null, 전체 개수 요청, 검색어=$keyword");
+
+
+    // ✅ PageRequestDTO 데이터를 쿼리 파라미터로 변환
+    final Uri requestUrl = Uri.parse(
+      // 페이징_기반_코드
+      // "$serverIp/list?page=$currentPage&size=$pageSize&type=&keyword=&from=&to=&completed=",
+      // 커서_기반_코드
+      // "$serverIp/list2?size=10${lastCursorId != null ? '&cursor=$lastCursorId' : ''}",
+
+      // ✅ 최초 호출에서는 전체 개수를 가져오기 위해 size=0
+      // "$serverIp/list2?size=10",
+      // 검색 기능 추가,
+        "$serverIp/list2?size=10${lastCursorId != null
+            ? '&cursor=$lastCursorId'
+            : ''}&type=$searchType&keyword=$keyword"
+
+    );
+
+    try {
+      final response = await http.get(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        PageResponseDTO<TodoDTO> pageResponse = PageResponseDTO.fromJson(
+          responseData,
+              (json) => TodoDTO.fromJson(json),
+        );
+
+        // 페이징_기반_코드
+        // todos = pageResponse.dtoList;
+        // total = pageResponse.total; // ✅ 전체 데이터 개수 설정
+        // hasMore = pageResponse.dtoList.isNotEmpty; // ✅ 다음 데이터 존재 여부 확인
+
+        // 커서_기반_코드
+        if (pageResponse.dtoList.isNotEmpty) {
+          todos = pageResponse.dtoList; // ✅ 최초 10개 데이터 추가
+          lastCursorId = pageResponse.nextCursor; // ✅ 다음 커서 업데이트
+          hasMore = pageResponse.hasNext; // ✅ 다음 데이터 여부 확인
+          remainingCount =
+              pageResponse.total - todos.length; // ✅ 전체 개수 - 받은 데이터 개수
+          print("✅ [Flutter] 전체 개수: ${pageResponse
+              .total}, 남은 개수: $remainingCount");
+        } else {
+          lastCursorId = null; // ✅ 만약 데이터가 없으면 커서 초기화
+          hasMore = false;
+        }
+      } else {
+        print("에러 발생: ${response.body}");
+      }
+    } catch (e) {
+      print("네트워크 오류: $e");
+    }
+
+    isLoading = false;
+    notifyListeners();
+  }
+
+  // ✅ 스크롤을 내릴 때 다음 페이지 로드
+  // ✅ 스크롤을 내릴 때 10개씩 줄여서 데이터 요청
+  // ✅ 스크롤을 내릴 때 다음 페이지 로드 (10개 제외한 나머지부터)
+  Future<void> fetchMoreTodos() async {
+    if (isFetchingMore || !hasMore || lastCursorId == null ||
+        remainingCount <= 0) {
+      print(
+          "🚨 [Flutter] 데이터 로딩 중단: cursor=$lastCursorId, hasMore=$hasMore, remaining=$remainingCount");
+      hasMore = false; // ✅ 데이터가 남아 있지 않으면 로딩 중단
+      notifyListeners();
+      return;
+    }
+
+    isFetchingMore = true;
+    notifyListeners();
+
+    String? accessToken = await secureStorage.read(key: "accessToken");
+
+    if (accessToken == null) {
+      print("토큰이 없습니다.");
+      isFetchingMore = false;
+      notifyListeners();
+      return;
+    }
+
+    final int fetchSize = remainingCount > 10
+        ? 10
+        : remainingCount; // ✅ 남은 개수에서 최대 10개씩 요청
+
+
+    print(
+        "📢 [Flutter] fetchMoreTodos() 요청: cursor=$lastCursorId, fetchSize=$fetchSize, remaining=$remainingCount");
+
+
+    final Uri requestUrl = Uri.parse(
+      // 커서_기반_코드
+      // "$serverIp/list?page=${currentPage + 1}&size=$pageSize&type=&keyword=&from=&to=&completed=",
+      // 페이징_기반_코드
+        "$serverIp/list2?size=$fetchSize${lastCursorId != null
+            ? '&cursor=$lastCursorId'
+            : ''}"
+    );
+
+    try {
+      final response = await http.get(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        PageResponseDTO<TodoDTO> pageResponse = PageResponseDTO.fromJson(
+          responseData,
+              (json) => TodoDTO.fromJson(json),
+        );
+
+        // 커서_기반_코드
+        if (pageResponse.dtoList.isNotEmpty) {
+          todos.addAll(pageResponse.dtoList);
+          lastCursorId = pageResponse.nextCursor; // ✅ 다음 커서 업데이트
+          remainingCount -= fetchSize; // ✅ 남은 개수에서 요청한 개수만큼 감소
+          // ✅ 남은 개수가 0이거나 nextCursor가 null이면 데이터 로딩 중단
+          if (remainingCount <= 0 || pageResponse.nextCursor == null) {
+            hasMore = false; // ✅ 더 이상 데이터 없음
+            lastCursorId = null; // ✅ 커서 초기화
+          }
+          print("✅ [Flutter] 전체 개수: ${pageResponse
+              .total}, 남은 개수: $remainingCount");
+          // 페이징_기반_코드
+          // currentPage++; // ✅ 페이지 증가
+          // hasMore = pageResponse.dtoList.length == pageSize; // ✅ 다음 페이지 여부 확인
+        } else {
+          print("🚨 [Flutter] 더 이상 데이터 없음, hasMore=false");
+          lastCursorId = null; // ✅ 만약 데이터가 없으면 커서 초기화
+          hasMore = false;
+        }
+      } else {
+        print("에러 발생: ${response.body}");
+      }
+    } catch (e) {
+      print("네트워크 오류: $e");
+    }
+
+    isFetchingMore = false;
+    notifyListeners();
+  }
+
+  // 글작성 부분의 컨트롤러
+// ✅ Todo 작성 요청 (`POST /api/todo`)
+  Future<bool> createTodo(String title, DateTime dueDate, bool complete) async {
+    String? accessToken = await secureStorage.read(key: "accessToken");
+    String? mid = await getLoggedInUserId(); // 로그인한 사용자 ID 가져오기
+
+    if (accessToken == null || mid == null) {
+      print("⚠️ [Flutter] 액세스 토큰 또는 사용자 ID 없음");
+      return false;
+    }
+
+    final Uri requestUrl = Uri.parse("$serverIp/");
+
+    final Map<String, dynamic> postData = {
+      "title": title,
+      "writer": mid, // ✅ 로그인한 사용자 ID 자동 입력
+      "dueDate":
+      "${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day
+          .toString().padLeft(2, '0')}",
+      "complete": complete,
+    };
+
+    try {
+      final response = await http.post(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          "Authorization": "Bearer $accessToken",
+        },
+        body: jsonEncode(postData),
+      );
+
+      print("📢 [Flutter] 응답 코드: ${response.statusCode}");
+      print("📢 [Flutter] 응답 바디: ${response.body}");
+
+      if (response.statusCode == 200) {
+        print("✅ [Flutter] Todo 작성 성공!");
+
+        // ✅ 리스트 새로고침
+        await fetchTodos();
+        notifyListeners();
+        return true;
+      } else {
+        print("⚠️ [Flutter] 서버 응답 오류: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ [Flutter] 네트워크 오류: $e");
+    }
+    return false;
+  }
+
+//삭제 로직 추가.
+
+  Future<bool> deleteTodo(int tno) async {
+    String? accessToken = await secureStorage.read(key: "accessToken");
+    if (accessToken == null) {
+      print("⚠️ [Flutter] accessToken 없음!");
+      return false;
+    }
+
+    final Uri requestUrl = Uri.parse("$serverIp/$tno");
+    print("📢 [Flutter] DELETE 요청 URL: $requestUrl");
+
+    try {
+      final response = await http.delete(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ [Flutter] Todo 삭제 성공!");
+
+        // ✅ 리스트 새로고침
+        await fetchTodos(); // ✅ UI 업데이트
+        notifyListeners();
+
+        return true;
+      } else {
+        print("⚠️ [Flutter] 삭제 실패: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ [Flutter] 네트워크 오류: $e");
+    }
+    return false;
+  }
+
+  void confirmDelete(BuildContext context, int tno) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("삭제 확인"),
+          content: const Text("정말 삭제하시겠습니까?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("취소"),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // ✅ 다이얼로그 닫기
+                bool success = await deleteTodo(tno);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("삭제되었습니다.")),
+                  );
+                }
+              },
+              child: const Text("삭제", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ✅ Todo 상세 조회 요청 (`GET /api/todo/{tno}`)
+  Future<TodoDTO?> fetchTodoDetails(int tno) async {
+    String? accessToken = await secureStorage.read(key: "accessToken");
+    if (accessToken == null) return null;
+
+    final Uri requestUrl = Uri.parse("$serverIp/$tno");
+
+    try {
+      final response = await http.get(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          "Authorization": "Bearer $accessToken",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        return TodoDTO.fromJson(responseData);
+      }
+    } catch (e) {
+      print("네트워크 오류: $e");
+    }
+    return null;
+  }
+
+  // ✅ Todo 수정 요청 (`PUT /api/todo/{tno}`)
+  Future<bool> updateTodo(int tno, String title, String writer,
+      DateTime dueDate, bool complete) async {
+    String? accessToken = await secureStorage.read(key: "accessToken");
+    if (accessToken == null) return false;
+
+    final Uri requestUrl = Uri.parse("$serverIp/$tno");
+
+    final Map<String, dynamic> updateData = {
+      "tno": tno,
+      "title": title,
+      "writer": writer,
+      "dueDate":
+      "${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}", // ✅ 날짜 포맷 수정
+      "complete": complete,
+    };
+
+    try {
+      final response = await http.put(
+        requestUrl,
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          "Authorization": "Bearer $accessToken",
+        },
+        body: jsonEncode(updateData),
+      );
+      print("📢 [Flutter] 응답 코드: ${response.statusCode}");
+      print("📢 [Flutter] 응답 바디: ${response.body}");
+
+      if (response.statusCode == 200) {
+        print("✅ [Flutter] Todo 수정 성공!");
+
+        // ✅ 리스트 새로고침
+        await fetchTodos(); // ✅ Todo 리스트 다시 불러오기
+        notifyListeners(); // ✅ UI 업데이트
+        return true;
+      } else {
+        print("⚠️ [Flutter] 서버 응답 오류: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ [Flutter] 네트워크 오류: $e");
+    }
+    return false;
+  }
+  
+}
+
+
+3 
+프로바이더 
+재사용. 
+
+4
+라우팅 필요. 
+수정 폼 화면 필요. 
+import 'package:busanit501_flutter_test/sample_routing/login_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/main_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/my_splash_screen2.dart';
+import 'package:busanit501_flutter_test/sample_routing/pd_test_screen/my_pd_test_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/signup_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_add_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_edit_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_list_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_login.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_main_screen.dart';
+import 'package:busanit501_flutter_test/sample_routing/todos_test/screen/todos_signup_screen.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+class MyAppRouting extends StatelessWidget {
+  const MyAppRouting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      // 시작 하는 화면을, 스플래쉬 화면으로 교체,
+      home: const MySplashScreen2(),
+      //라우팅 준비물 1,
+      routes: {
+        '/main': (context) => const TodosMainScreen(),
+        '/signup': (context) => const TodosSignupScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/pdtest1': (context) => const MyPdTestScreen(),
+        '/todos': (context) => const TodosScreen(),
+        '/todoCreate': (context) => const TodoCreateScreen(),
+        '/todoDetail': (context) => TodoDetailScreen(tno: ModalRoute.of(context)!.settings.arguments as int),
+        
+      },
+    );
+  }
+}
+
