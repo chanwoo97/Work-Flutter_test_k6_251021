@@ -53,7 +53,7 @@ class _MySplashScreen2State extends State<MySplashScreen2> {
                         ),
                         '나의 첫 Splash 화면'),
                     Image.asset(
-                      'assets/images/logo.jpg',
+                      'assets/images/image.jpg',
                       width: 400,
                     ),
                     SizedBox(height: 16,),

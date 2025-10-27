@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.2
+  sdk: ^3.8.1
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -34,6 +34,10 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  #외부 라이브러리 설치하기. -> 적용 : 상단 , Pub get 클릭.
+  provider: ^6.0.5 # 상태를 관리하기 위한 도구
+  http: ^0.13.6 # 기본적이 http 통신 도구
+  dio: ^5.8.0+1 # 고급 기능이 포함된 통신 도구
 
 dev_dependencies:
   flutter_test:
@@ -58,9 +62,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # 프로젝트 폴더의 assets -> image 폴더 하위의 이미지 파일을 시스템에게 알려주기.
+  # 프로젝트 폴더의 assets -> images 폴더 하위의 이미지 파일을 시스템에게 알려주기.
   assets:
-     - assets/images/
+    - assets/images/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

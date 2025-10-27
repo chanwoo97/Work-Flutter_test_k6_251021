@@ -22,6 +22,10 @@ class MyMainScreen extends StatelessWidget {
                   onPressed: () => Navigator.pushNamed(context, '/signup'),
                   child: const Text('회원 가입'),
                 ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pushNamed(context, '/pdtest'),
+                  child: const Text('부산 맛집 공공 데이터'),
+                ),
               ],
             )),
       );
