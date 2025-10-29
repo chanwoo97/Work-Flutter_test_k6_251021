@@ -49,7 +49,7 @@ class _MySplash2State extends State<MySplash2> {
                       ),
                       '나의 첫 Splash 화면'
                   ),
-                  Image.asset('assets/images/logo.jpg',width: 400,),
+                  Image.asset('assets/images/image.jpg',width: 400,),
                   // 공간 여백 잡는 위젯을 사용.
                   SizedBox(height: 16,),
                   CircularProgressIndicator(

@@ -1,7 +1,5 @@
-
 import 'package:work_flutter/screen/pd_data/food_screen.dart';
 import 'package:work_flutter/screen/signup_screen.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../sample_design/list_of_listview_sample.dart';
 import '../sample_design/navigation_mode_sample1.dart';
@@ -21,12 +19,12 @@ class MyAppRouting extends StatelessWidget {
       home: const MySplash2(),
       //라우팅 준비물 1,
       routes: {
-        '/main': (context) => const MyMainScreen(),
+        '/main': (context) => MainScreen2(),
         '/signup': (context) => const MySignUpScreen(),
         '/login': (context) => const MyLoginScreen(),
-        // 공공 데이터 받아오는 화면으로 라우팅 추가.
+        // 공공데이터 받아 오는 화면으로 라우팅 추가.
         '/pdtest': (context) => const MyPdTestScreen(),
-        '/sample_design': (context) => const  Sample3ListOfListView(),
+        '/sample_design': (context) => const Sample3ListOfListView(),
         '/sample_design2': (context) => MaterialHomePage(),
         '/sample_design3': (context) => ResponsiveNavBarPage(),
       },
