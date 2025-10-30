@@ -1,6 +1,9 @@
 import 'package:work_flutter/screen/pd_data/food_screen.dart';
 import 'package:work_flutter/screen/signup_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:work_flutter/screen/todos/todo_create_screen.dart';
+import 'package:work_flutter/screen/todos/todo_detail_screen.dart';
+import 'package:work_flutter/screen/todos/todos_screen.dart';
 import '../sample_design/list_of_listview_sample.dart';
 import '../sample_design/navigation_mode_sample1.dart';
 import '../sample_design/tap_mode_sample2.dart';
@@ -20,13 +23,17 @@ class MyAppRouting extends StatelessWidget {
       //라우팅 준비물 1,
       routes: {
         '/main': (context) => MainScreen2(),
-        '/signup': (context) => const MySignUpScreen(),
+        '/signup': (context) => const SignupScreen(),
         '/login': (context) => const MyLoginScreen(),
         // 공공데이터 받아 오는 화면으로 라우팅 추가.
         '/pdtest': (context) => const MyPdTestScreen(),
         '/sample_design': (context) => const Sample3ListOfListView(),
         '/sample_design2': (context) => MaterialHomePage(),
         '/sample_design3': (context) => ResponsiveNavBarPage(),
+        '/todos': (context) => TodosScreen(),
+        "/todoCreate": (context) => const TodoCreateScreen(),
+        '/todoDetail': (context) => TodoDetailScreen(tno: ModalRoute.of(context)!.settings.arguments as int),
+
       },
     );
   }

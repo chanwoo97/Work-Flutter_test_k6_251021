@@ -7,7 +7,9 @@ import 'package:work_flutter/screen/my_splash2.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'controller/auth/signup_controller.dart';
 import 'controller/pd_data/food_controller.dart';
+import 'controller/todos/todo_controller.dart';
 import 'screen/sample_my_app1.dart';
 
 void main() {
@@ -24,7 +26,8 @@ void main() {
           ChangeNotifierProvider(create: (context) => FoodController()),
           // 로그인 컨트롤러 추가. 다른 구조도 같은 패턴 형식으로 진행.
           ChangeNotifierProvider(create: (context) => LoginController()),
-
+          ChangeNotifierProvider(create: (context) => SignupController()),
+          ChangeNotifierProvider(create: (context) => TodoController()),
         ],
         child: const MyAppRouting(),
       )
