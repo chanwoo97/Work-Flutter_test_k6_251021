@@ -7,6 +7,8 @@ import 'package:work_flutter/screen/todos/todos_screen.dart';
 import '../sample_design/list_of_listview_sample.dart';
 import '../sample_design/navigation_mode_sample1.dart';
 import '../sample_design/tap_mode_sample2.dart';
+import 'ai/image/ai_image_screen.dart';
+import 'ai/stock/ai_stock_screen.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
 import 'my_splash2.dart';
@@ -33,7 +35,9 @@ class MyAppRouting extends StatelessWidget {
         '/todos': (context) => TodosScreen(),
         "/todoCreate": (context) => const TodoCreateScreen(),
         '/todoDetail': (context) => TodoDetailScreen(tno: ModalRoute.of(context)!.settings.arguments as int),
-
+        // ai 라우티.
+        "/ai-image": (context) => AiImageScreen(),
+        "/ai-stock": (context) => AiStockScreen(),
       },
     );
   }

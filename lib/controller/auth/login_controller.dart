@@ -14,7 +14,7 @@ class LoginController extends ChangeNotifier {
   // final String serverIp = "http://192.168.219.103:8080"; // 서버 주소
   // 주의사항, 각자 아이피를 사용해야합니다. 그대로 사용하면 안됩니다.
   // localhost 로 하면 안됩니다.
-  final String serverIp = "http://10.100.201.36:8080"; // 서버 주소 변경 필요
+  final String serverIp = "http://10.0.2.2:8080"; // 서버 주소 변경 필요
   // 만약 에뮬레이터로 진행을 하면 10.0.2.2로 변경해서 사용해보기
   bool isLoading = false; // 로그인 로딩 상태
   bool isLoggedIn = false; // 로그인 여부
@@ -51,6 +51,8 @@ class LoginController extends ChangeNotifier {
         String accessToken = responseData["accessToken"];
         String refreshToken = responseData["refreshToken"];
         String profileImg = responseData["profileImg"];
+        // 프로필 이미지 없이 회원가입 시 사용
+        // String profileImg = responseData["profileImg"] ?? "";
 
         // JWT 토큰 보안 저장소에 저장
         await secureStorage.write(key: "accessToken", value: accessToken);
